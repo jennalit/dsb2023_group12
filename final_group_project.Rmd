@@ -1,6 +1,6 @@
 ---
 title: "Final Group project"
-author: "Jenna Thomas, Colby Richardson (Group 12)"
+author: "Jenna Thomas, Colby Richardson, Jamie McGraw (Group 12)"
 date: "`r Sys.Date()`"
 output:
   html_document:
@@ -194,6 +194,7 @@ city_geo <- card_fraud %>%
 -   Do we have excessive number of categories? Do we want to combine some?
 
 ```{r}
+
 card_fraud %>% 
   count(category, sort=TRUE)%>% 
   mutate(perc = n/sum(n))
@@ -202,7 +203,6 @@ card_fraud %>%
   count(job, sort=TRUE) %>% 
   mutate(perc = n/sum(n))
 
-
 ```
 
 
@@ -210,7 +210,6 @@ The predictors `category` and `job` are transformed into factors.
 
 ```{r}
 #| label: convert-strings-to-factors
-
 
 card_fraud <- card_fraud %>% 
   mutate(category = factor(category),
@@ -240,7 +239,7 @@ You have a number of variables and you have to decide which ones to use in your 
 
 You will be running a series of different models, along the lines of the California housing example we have seen in class. However, this dataset has 670K rows and if you try various models and run cross validation on them, your computer may slow down or crash.
 
-Thus, we will work with a smaller sample of 10% of the values the original dataset to identify the best model, and once we have the best model we can use the full dataset to train- test our best model.
+Thus, we will work with a smaller sample of 10% of the values the original dataset to identify the best model, and once we have the best model we can use the full dataset to train- is_fraud our best model.
 
 
 ```{r}
@@ -248,12 +247,12 @@ Thus, we will work with a smaller sample of 10% of the values the original datas
 my_card_fraud <- card_fraud %>% 
   # focus on relevant variables
   select(is_fraud, amt, distance_km, hour, wday, month_name, age, category) %>%
-  # select a smaller subset, 10% of the entire dataframe 
-  slice_sample(prop = 0.10) 
+  # select a smaller subset, 5% of the entire dataframe 
+  slice_sample(prop = 0.05) 
 ```
 
 
-## Split the data in training - testing
+## Split the data in training - is_frauding
 
 ```{r}
 # **Split the data**
@@ -265,7 +264,7 @@ data_split <- initial_split(my_card_fraud, # updated data
                            strata = is_fraud)
 
 card_fraud_train <- training(data_split) 
-card_fraud_test <- testing(data_split)
+# card_fraud_is_fraud <- is_frauding(data_split)
 ```
 
 
@@ -274,6 +273,7 @@ card_fraud_test <- testing(data_split)
 Start with 3 CV folds to quickly get an estimate for the best model and you can increase the number of folds to 5 or 10 later.
 
 ```{r}
+
 set.seed(123)
 cv_folds <- vfold_cv(data = card_fraud_train, 
                           v = 3, 
@@ -290,9 +290,12 @@ What steps are you going to add to your recipe? Do you need to do any log transf
 
 fraud_rec <- recipe(is_fraud ~ ., data = card_fraud_train) %>%
   # Transforms data to remove right-skewed variables
-  step_log(amt, distance_km) %>%
-  # Categories with less than 5% are grouped into 'Other'
-  step_other(category, threshold = .05) 
+  step_log(amt, distance_km, age) %>%
+  step_naomit(everything(), skip = TRUE) %>% 
+  step_novel(all_nominal(), -all_outcomes()) %>%
+  step_normalize(all_numeric(), -all_outcomes()) %>% 
+  step_dummy(all_nominal(), -all_outcomes()) %>%
+  step_zv(all_numeric(), -all_outcomes()) 
 
 
 ```
@@ -300,6 +303,7 @@ fraud_rec <- recipe(is_fraud ~ ., data = card_fraud_train) %>%
 Once you have your recipe, you can check the pre-processed dataframe 
 
 ```{r}
+
 prepped_data <- 
   fraud_rec %>% # use the recipe object
   prep() %>% # perform the recipe on training data
@@ -327,6 +331,43 @@ You should define the following classification models:
 # 2. set the `engine`
 # 3. Set the `mode`:  classification
 
+# Logistic regression
+log_spec <-  logistic_reg() %>%  # model type
+  set_engine(engine = "glm") %>%  # model engine
+  set_mode("classification") # model mode
+
+# Show your model specification
+log_spec
+
+# Decision Tree
+tree_spec <- decision_tree() %>%
+  set_engine(engine = "C5.0") %>%
+  set_mode("classification")
+
+tree_spec
+
+# Random Forest
+library(ranger)
+
+rf_spec <- 
+  rand_forest() %>% 
+  set_engine("ranger", importance = "impurity") %>% 
+  set_mode("classification")
+
+
+# Boosted tree (XGBoost)
+library(xgboost)
+
+xgb_spec <- 
+  boost_tree() %>% 
+  set_engine("xgboost") %>% 
+  set_mode("classification") 
+
+# K-nearest neighbour (k-NN)
+knn_spec <- 
+  nearest_neighbor(neighbors = 4) %>% # we can adjust the number of neighbors 
+  set_engine("kknn") %>% 
+  set_mode("classification") 
 
 ```
 
@@ -343,6 +384,28 @@ log_wflow <- # new workflow object
  add_recipe(fraud_rec) %>%   # use the new recipe
  add_model(log_spec)   # add your model spec
 
+## A few more workflows
+
+tree_wflow <-
+ workflow() %>%
+ add_recipe(fraud_rec) %>% 
+ add_model(tree_spec) 
+
+rf_wflow <-
+ workflow() %>%
+ add_recipe(fraud_rec) %>% 
+ add_model(rf_spec) 
+
+xgb_wflow <-
+ workflow() %>%
+ add_recipe(fraud_rec) %>% 
+ add_model(xgb_spec)
+
+knn_wflow <-
+ workflow() %>%
+ add_recipe(fraud_rec) %>% 
+ add_model(knn_spec)
+
 ```
 
 
@@ -351,6 +414,8 @@ log_wflow <- # new workflow object
 You may want to compare the time it takes to fit each model. `tic()` starts a simple timer and `toc()` stops it
 
 ```{r, fit_models}
+
+# Logistic regression results{.smaller}
 tic()
 log_res <- log_wflow %>% 
   fit_resamples(
@@ -361,6 +426,101 @@ log_res <- log_wflow %>%
     control = control_resamples(save_pred = TRUE)) 
 time <- toc()
 log_time <- time[[4]]
+
+# Show average performance over all folds (note that we use log_res):
+log_res %>%  collect_metrics(summarize = TRUE)
+
+# Show performance for every single fold:
+log_res %>%  collect_metrics(summarize = FALSE)
+
+## `collect_predictions()` and get confusion matrix{.smaller}
+
+log_pred <- log_res %>% collect_predictions()
+
+log_pred %>%  conf_mat(is_fraud, .pred_class) 
+
+log_pred %>% 
+  conf_mat(is_fraud, .pred_class) %>% 
+  autoplot(type = "mosaic") +
+  geom_label(aes(
+      x = (xmax + xmin) / 2, 
+      y = (ymax + ymin) / 2, 
+      label = c("TP", "FN", "FP", "TN")))
+
+
+log_pred %>% 
+  conf_mat(is_fraud, .pred_class) %>% 
+  autoplot(type = "heatmap")
+
+## ROC Curve
+
+log_pred %>% 
+  group_by(id) %>% # id contains our folds
+  roc_curve(is_fraud, .pred_1) %>% 
+  autoplot()
+
+## Decision Tree results
+tic()
+tree_res <-
+  tree_wflow %>% 
+  fit_resamples(
+    resamples = cv_folds, 
+    metrics = metric_set(
+      recall, precision, f_meas, 
+      accuracy, kap,
+      roc_auc, sens, spec),
+    control = control_resamples(save_pred = TRUE)
+    ) 
+time <- toc()
+tree_time <- time[[4]]
+
+## Random Forest
+
+tic()
+rf_res <-
+  rf_wflow %>% 
+  fit_resamples(
+    resamples = cv_folds, 
+    metrics = metric_set(
+      recall, precision, f_meas, 
+      accuracy, kap,
+      roc_auc, sens, spec),
+    control = control_resamples(save_pred = TRUE)
+    ) 
+time <- toc()
+rf_time <- time[[4]]
+
+## Boosted tree - XGBoost
+
+tic()
+xgb_res <- 
+  xgb_wflow %>% 
+  fit_resamples(
+    resamples = cv_folds, 
+    metrics = metric_set(
+      recall, precision, f_meas, 
+      accuracy, kap,
+      roc_auc, sens, spec),
+    control = control_resamples(save_pred = TRUE)
+    ) 
+time <- toc()
+xgb_time <- time[[4]]
+
+## K-nearest neighbour
+
+tic()
+knn_res <- 
+  knn_wflow %>% 
+  fit_resamples(
+    resamples = cv_folds, 
+    metrics = metric_set(
+      recall, precision, f_meas, 
+      accuracy, kap,
+      roc_auc, sens, spec),
+    control = control_resamples(save_pred = TRUE)
+    ) 
+time <- toc()
+knn_time <- time[[4]]
 
 
 ```
@@ -377,20 +537,162 @@ log_metrics <-
   mutate(model = "Logistic Regression",
          time = log_time)
 
-# add mode models here
+# Show average performance over all folds (note that we use log_res):
+log_res %>%  collect_metrics(summarize = TRUE)
+
+# Show performance for every single fold:
+log_res %>%  collect_metrics(summarize = FALSE)
+
+
+## `collect_predictions()` and get confusion matrix{.smaller}
+
+log_pred <- log_res %>% collect_predictions()
+
+log_pred %>%  conf_mat(is_fraud, .pred_class) 
+
+log_pred %>% 
+  conf_mat(is_fraud, .pred_class) %>% 
+  autoplot(type = "mosaic") +
+  geom_label(aes(
+      x = (xmax + xmin) / 2, 
+      y = (ymax + ymin) / 2, 
+      label = c("TP", "FN", "FP", "TN")))
+
+
+log_pred %>% 
+  conf_mat(is_fraud, .pred_class) %>% 
+  autoplot(type = "heatmap") 
+
+
+## ROC Curve
+
+log_pred %>% 
+  group_by(id) %>% # id contains our folds
+  roc_curve(is_fraud, .pred_1) %>% 
+  autoplot()
+
+
+## Decision Tree results
+
+tree_res %>%  collect_metrics(summarize = TRUE)
+
+## Random Forest
+
+rf_res %>%  collect_metrics(summarize = TRUE)
+
+## Boosted tree - XGBoost
+
+xgb_res %>% collect_metrics(summarize = TRUE)
+
+## K-nearest neighbour
+
+knn_res %>% collect_metrics(summarize = TRUE)
+
+
+## Model Comparison
+
+log_metrics <- 
+  log_res %>% 
+  collect_metrics(summarise = TRUE) %>%
+  # add the name of the model to every row
+  mutate(model = "Logistic Regression",
+         time = log_time) 
+
+tree_metrics <- 
+  tree_res %>% 
+  collect_metrics(summarise = TRUE) %>%
+  mutate(model = "Decision Tree",
+         time = tree_time)
+
+rf_metrics <- 
+  rf_res %>% 
+  collect_metrics(summarise = TRUE) %>%
+  mutate(model = "Random Forest",
+         time = rf_time)
+
+xgb_metrics <- 
+  xgb_res %>% 
+  collect_metrics(summarise = TRUE) %>%
+  mutate(model = "XGBoost",
+         time = xgb_time)
+
+knn_metrics <- 
+  knn_res %>% 
+  collect_metrics(summarise = TRUE) %>%
+  mutate(model = "Knn",
+         time = knn_time)
 
 # create dataframe with all models
 model_compare <- bind_rows(log_metrics,
-                            tree_metrics,
-                            rf_metrics,
+                           tree_metrics,
+                           rf_metrics,
                            xgb_metrics,
-                           knn_metrics
-                      ) %>% 
-  # get rid of 'sec elapsed' and turn it into a number
-  mutate(time = str_sub(time, end = -13) %>% 
-           as.double()
-         )
+                           knn_metrics) 
 
+#Pivot wider to create barplot
+  model_comp <- model_compare %>% 
+  select(model, .metric, mean, std_err) %>% 
+  pivot_wider(names_from = .metric, values_from = c(mean, std_err)) 
+
+# show mean are under the curve (ROC-AUC) for every model
+model_comp %>% 
+  arrange(mean_roc_auc) %>% 
+  mutate(model = fct_reorder(model, mean_roc_auc)) %>% # order results
+  ggplot(aes(model, mean_roc_auc, fill=model)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_brewer(palette = "Blues") +
+   geom_text(
+     size = 3,
+     aes(label = round(mean_roc_auc, 2), 
+         y = mean_roc_auc + 0.08),
+     vjust = 1
+  )+
+  theme_light()+
+  theme(legend.position = "none")+
+  labs(y = NULL)
+
+## `last_fit()` on is_fraud set
+
+# - `last_fit()`  fits a model to the whole training data and evaluates it on the is_fraud set. 
+# - provide the workflow object of the best model as well as the data split object (not the training data). 
+ 
+last_fit_xgb <- last_fit(xgb_wflow, 
+                        split = data_split,
+                        metrics = metric_set(
+                          accuracy, f_meas, kap, precision,
+                          recall, roc_auc, sens, spec))
+
+last_fit_xgb %>% collect_metrics(summarize = TRUE)
+
+#Compare to training
+xgb_res %>% collect_metrics(summarize = TRUE)
+
+
+## Variable importance using `{vip}` package
+
+library(vip)
+
+last_fit_xgb %>% 
+  pluck(".workflow", 1) %>%   
+  extract_fit_parsnip() %>% 
+  vip(num_features = 10) +
+  theme_light()
+
+
+## Final Confusion Matrix
+
+last_fit_xgb %>%
+  collect_predictions() %>% 
+  conf_mat(is_fraud, .pred_class) %>% 
+  autoplot(type = "heatmap")
+
+
+## Final ROC curve
+last_fit_xgb %>% 
+  collect_predictions() %>% 
+  roc_curve(is_fraud, .pred_Pass) %>% 
+  autoplot()
 
 ```
 
@@ -401,9 +703,9 @@ This is a highly imbalanced data set, as roughly 99.5% of all transactions are o
 ## `last_fit()`
 ```{r}
 
-## `last_fit()` on test set
+## `last_fit()` on is_fraud set
 
-# - `last_fit()`  fits a model to the whole training data and evaluates it on the test set. 
+# - `last_fit()`  fits a model to the whole training data and evaluates it on the is_fraud set. 
 # - provide the workflow object of the best model as well as the data split object (not the training data). 
  
 
