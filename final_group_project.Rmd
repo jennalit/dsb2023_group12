@@ -55,7 +55,7 @@ As we will be building a classifier model using tidymodels, there's two things w
 #| message: false
 #| warning: false
 
-card_fraud <- read_csv("hw2_card_fraud.csv") %>% 
+card_fraud <- read_csv("card_fraud.csv") %>% 
 
   mutate(
     # in tidymodels, outcome should be a factor  
@@ -129,12 +129,30 @@ Group all variables by type and examine each variable class by class. The datase
 4.  Date/Times
 5.  Numerical
 
+```{r}
+
+sapply(card_fraud, class)
+
+```
+
+
 Strings are usually not a useful format for classification problems. The strings should be converted to factors, dropped, or otherwise transformed.
 
 ***Strings to Factors*** 
 
 -   `category`, Category of Merchant
 -   `job`, Job of Credit Card Holder
+
+```{r}
+
+card_fraud <- card_fraud %>%
+  mutate(category = as.factor(category)) %>%
+  mutate(job = as.factor(job))
+
+class(card_fraud$category)
+
+```
+
 
 ***Strings to Geospatial Data*** 
 
