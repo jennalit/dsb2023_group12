@@ -30,6 +30,8 @@ library(tictoc)
 library(vip)
 library(ranger)
 library(sf)
+library(tidygeocoder)
+
 ```
 
 # The problem: predicting credit card fraud
@@ -174,7 +176,15 @@ We have plenty of geospatial data as lat/long pairs, so I want to convert city/s
 
 ```{r}
 
-
+city_geo <- card_fraud %>%
+  distinct(city, state) %>%
+  geocode(
+    city = city,
+    state = state,
+    method = "osm",
+    lat = "city_lat",
+    long = "city_long"
+  )
 
 ```
 
@@ -236,6 +246,8 @@ Thus, we will work with a smaller sample of 10% of the values the original datas
 ```{r}
 # select a smaller subset
 my_card_fraud <- card_fraud %>% 
+  # focus on relevant variables
+  select(is_fraud, amt, distance_km, hour, wday, month_name, age, category) %>%
   # select a smaller subset, 10% of the entire dataframe 
   slice_sample(prop = 0.10) 
 ```
@@ -277,9 +289,10 @@ What steps are you going to add to your recipe? Do you need to do any log transf
 ```{r, define_recipe}
 
 fraud_rec <- recipe(is_fraud ~ ., data = card_fraud_train) %>%
-
-
-
+  # Transforms data to remove right-skewed variables
+  step_log(amt, distance_km) %>%
+  # Categories with less than 5% are grouped into 'Other'
+  step_other(category, threshold = .05) 
 
 
 ```
