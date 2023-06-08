@@ -144,8 +144,43 @@ card_fraud %>%
   ggplot(aes(x = is_fraud, y = amt, fill = year)) +
   geom_bar(stat = "identity", position = "dodge")
 # doesn't seem to be a difference between the years
-  
 
+
+# assess fraud by state  
+
+card_fraud_by_state <- card_fraud %>%
+  group_by(is_fraud,state) %>%
+  summarise(total=n()) %>% 
+  filter(is_fraud == 1) %>% 
+  arrange(desc(total)) %>% 
+  slice(1:10)
+  
+print(card_fraud_by_state)
+ggplot(card_fraud_by_state, aes(x = reorder(state, -total), y = total)) +
+  geom_bar(stat = "identity", fill="blue") +
+  geom_text(aes(label=total),position=position_stack(vjust=0.5)) +
+  xlab("State") +
+  ylab("Incidents of Fraud") +
+  ggtitle("Top 10 States for Fraud (2019-2020)") +
+  theme_minimal()
+
+# assess fraud by category
+card_fraud_by_category <- card_fraud %>%
+  group_by(is_fraud,category) %>%
+  summarise(total=n()) %>% 
+  filter(is_fraud == 1) %>% 
+  arrange(desc(total)) %>% 
+  slice(1:5)
+  
+print(card_fraud_by_category)
+
+ggplot(card_fraud_by_category, aes(x = reorder(category, -total), y = total)) +
+  geom_bar(stat = "identity", fill="blue") +
+  geom_text(aes(label=total),position=position_stack(vjust=0.5)) +
+  xlab("State") +
+  ylab("Category") +
+  ggtitle("Top 5 Categories for Fraud (2019-2020)") +
+  theme_minimal()
 ```
 
 
@@ -652,47 +687,6 @@ model_comp %>%
   theme(legend.position = "none")+
   labs(y = NULL)
 
-## `last_fit()` on is_fraud set
-
-# - `last_fit()`  fits a model to the whole training data and evaluates it on the is_fraud set. 
-# - provide the workflow object of the best model as well as the data split object (not the training data). 
- 
-last_fit_xgb <- last_fit(xgb_wflow, 
-                        split = data_split,
-                        metrics = metric_set(
-                          accuracy, f_meas, kap, precision,
-                          recall, roc_auc, sens, spec))
-
-last_fit_xgb %>% collect_metrics(summarize = TRUE)
-
-#Compare to training
-xgb_res %>% collect_metrics(summarize = TRUE)
-
-
-## Variable importance using `{vip}` package
-
-library(vip)
-
-last_fit_xgb %>% 
-  pluck(".workflow", 1) %>%   
-  extract_fit_parsnip() %>% 
-  vip(num_features = 10) +
-  theme_light()
-
-
-## Final Confusion Matrix
-
-last_fit_xgb %>%
-  collect_predictions() %>% 
-  conf_mat(is_fraud, .pred_class) %>% 
-  autoplot(type = "heatmap")
-
-
-## Final ROC curve
-last_fit_xgb %>% 
-  collect_predictions() %>% 
-  roc_curve(is_fraud, .pred_Pass) %>% 
-  autoplot()
 
 ```
 
@@ -708,6 +702,20 @@ This is a highly imbalanced data set, as roughly 99.5% of all transactions are o
 # - `last_fit()`  fits a model to the whole training data and evaluates it on the is_fraud set. 
 # - provide the workflow object of the best model as well as the data split object (not the training data). 
  
+ 
+last_fit_xgb <- last_fit(xgb_wflow, 
+                        split = data_split,
+                        metrics = metric_set(
+                          accuracy, f_meas, kap, precision,
+                          recall, roc_auc, sens, spec))
+
+last_fit_xgb %>% collect_metrics(summarize = TRUE)
+
+#Compare to training
+xgb_res %>% collect_metrics(summarize = TRUE)
+
+
+
 
 ```
 
@@ -717,6 +725,15 @@ This is a highly imbalanced data set, as roughly 99.5% of all transactions are o
 
 
 ```{r}
+
+library(vip)
+
+last_fit_xgb %>% 
+  pluck(".workflow", 1) %>%   
+  extract_fit_parsnip() %>% 
+  vip(num_features = 10) +
+  theme_light()
+
 
 ```
 
@@ -747,6 +764,10 @@ last_fit_xgb %>%
 
 ```{r}
 #| label: savings-for-cc-company
+
+# Boosted has highest mean ROC
+
+best_model_wflow <- xgb_wflow
 
 best_model_preds <- 
   best_model_wflow %>% 
