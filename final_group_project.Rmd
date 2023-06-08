@@ -855,5 +855,27 @@ cost_summary
 
 ```{r,error=TRUE}
 
+cost <- cost %>%
+  mutate(
+    #calculate dollar costs for below equation to compare navie vs our model
+    false_naives = if_else((is_fraud ==1),amt,0), 
+    false_negatives= if_else((is_fraud ==1)&(pred ==0),amt,0),
+    false_positives= if_else((is_fraud ==0)&(pred ==1),amt,0),
+    
+    #so we cab check that our definitions match our confusion matrix above
+    true_positives_count=if_else((is_fraud ==1)&(pred ==1),1,0),
+    true_negatives_count=if_else((is_fraud ==0)&(pred ==0),1,0),
+    false_positives_count=if_else((is_fraud ==0)&(pred ==1),1,0),
+    false_negatives_count=if_else((is_fraud ==1)&(pred ==0),1,0)
+  )
+# Summarising - cost have been calculated and our true/false positive/negative counts map to our confusion matrix
+cost_summary <- cost %>% 
+  summarise(across(starts_with(c("false","true", "amt")), 
+            ~ sum(.x, na.rm = TRUE)))
+
+#calculating our model improvement = ~$1.5m
+scales::dollar(cost_summary$false_naives - cost_summary$false_negatives - cost_summary$false_positives * 0.02)
+
+
 ```
 
