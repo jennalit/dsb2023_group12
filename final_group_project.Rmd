@@ -15,7 +15,7 @@ output:
 ---
 
 # hello
-```{r}
+```{r, error=TRUE}
 #| label: load-libraries
 #| echo: false # This option disables the printing of code (only output is displayed).
 #| message: false
@@ -56,7 +56,7 @@ As we will be building a classifier model using tidymodels, there's two things w
 1. Define the outcome variable `is_fraud` as a factor, or categorical, variable, instead of the numerical 0-1 varaibles.
 2. In tidymodels, the first level is the event of interest. If we leave our data as is, `0` is the first level, but we want to find out when we actually did (`1`) have a fraudulent transaction
 
-```{r}
+```{r,error=TRUE}
 #| echo: false
 #| message: false
 #| warning: false
@@ -96,7 +96,7 @@ The data dictionary is as follows
 
 We also add some of the variables we considered in our EDA for this dataset during homework 2.
 
-```{r}
+```{r,error=TRUE}
 card_fraud <- card_fraud %>% 
   mutate( hour = hour(trans_date_trans_time),
           wday = wday(trans_date_trans_time, label = TRUE),
@@ -136,7 +136,7 @@ Group all variables by type and examine each variable class by class. The datase
 4.  Date/Times
 5.  Numerical
 
-```{r}
+```{r,error=TRUE}
 # check class for each variable
 sapply(card_fraud, class)
 
@@ -221,7 +221,7 @@ Strings are usually not a useful format for classification problems. The strings
 -   `category`, Category of Merchant
 -   `job`, Job of Credit Card Holder
 
-```{r}
+```{r,error=TRUE}
 
 card_fraud <- card_fraud %>%
   mutate(category = as.factor(category)) %>%
@@ -239,17 +239,18 @@ We have plenty of geospatial data as lat/long pairs, so I want to convert city/s
 -   `city`, City of Credit Card Holder
 -   `state`, State of Credit Card Holder
 
-```{r}
+```{r,error=TRUE}
 
-city_geo <- card_fraud %>%
-  distinct(city, state) %>%
-  geocode(
-    city = city,
-    state = state,
-    method = "osm",
-    lat = "city_lat",
-    long = "city_long"
-  )
+# did not end up needing this data
+
+#city_geo <- card_fraud %>%
+ #distinct(city, state) %>%
+  #geocode(
+   #city = city,
+    #state = state,
+    #method = "osm",
+    #lat = "city_lat",
+    #long = "city_long")
 
 ```
 
@@ -258,7 +259,7 @@ city_geo <- card_fraud %>%
 
 -   Do we have excessive number of categories? Do we want to combine some?
 
-```{r}
+```{r,error=TRUE}
 
 card_fraud %>% 
   count(category, sort=TRUE)%>% 
@@ -273,7 +274,7 @@ card_fraud %>%
 
 The predictors `category` and `job` are transformed into factors.
 
-```{r}
+```{r,error=TRUE}
 #| label: convert-strings-to-factors
 
 card_fraud <- card_fraud %>% 
@@ -307,7 +308,7 @@ You will be running a series of different models, along the lines of the Califor
 Thus, we will work with a smaller sample of 10% of the values the original dataset to identify the best model, and once we have the best model we can use the full dataset to train- is_fraud our best model.
 
 
-```{r}
+```{r,error=TRUE}
 # select a smaller subset
 my_card_fraud <- card_fraud %>% 
   # focus on relevant variables
@@ -319,7 +320,7 @@ my_card_fraud <- card_fraud %>%
 
 ## Split the data in training - is_frauding
 
-```{r}
+```{r,error=TRUE}
 # **Split the data**
 
 set.seed(123)
@@ -337,7 +338,7 @@ card_fraud_train <- training(data_split)
 
 Start with 3 CV folds to quickly get an estimate for the best model and you can increase the number of folds to 5 or 10 later.
 
-```{r}
+```{r,error=TRUE}
 
 set.seed(123)
 cv_folds <- vfold_cv(data = card_fraud_train, 
@@ -351,7 +352,7 @@ cv_folds
 
 What steps are you going to add to your recipe? Do you need to do any log transformations?
 
-```{r, define_recipe}
+```{r, define_recipe,error=TRUE}
 
 fraud_rec <- recipe(is_fraud ~ ., data = card_fraud_train) %>%
   # Transforms data to remove right-skewed variables
@@ -367,7 +368,7 @@ fraud_rec <- recipe(is_fraud ~ ., data = card_fraud_train) %>%
 
 Once you have your recipe, you can check the pre-processed dataframe 
 
-```{r}
+```{r,error=TRUE}
 
 prepped_data <- 
   fraud_rec %>% # use the recipe object
@@ -389,7 +390,7 @@ You should define the following classification models:
 4. A boosted tree using Extreme Gradient Boosting, and the `xgboost` engine
 5. A k-nearest neighbours,  using 4 nearest_neighbors and the `kknn` engine  
 
-```{r, define_models}
+```{r, define_models,error=TRUE}
 ## Model Building 
 
 # 1. Pick a `model type`
@@ -438,7 +439,7 @@ knn_spec <-
 
 ## Bundle recipe and model with `workflows`
 
-```{r, define_workflows}
+```{r, define_workflows,error=TRUE}
 
 
 ## Bundle recipe and model with `workflows`
@@ -478,7 +479,7 @@ knn_wflow <-
 
 You may want to compare the time it takes to fit each model. `tic()` starts a simple timer and `toc()` stops it
 
-```{r, fit_models}
+```{r, fit_models,error=TRUE}
 
 # Logistic regression results{.smaller}
 tic()
@@ -725,7 +726,7 @@ model_comp %>%
 This is a highly imbalanced data set, as roughly 99.5% of all transactions are ok, and it's only 0.5% of transactions that are fraudulent. A `naive` model, which classifies everything as ok and not-fraud, would have an accuracy of 99.5%, but what about the sensitivity, specificity, the AUC, etc?
 
 ## `last_fit()`
-```{r}
+```{r,error=TRUE}
 
 ## `last_fit()` on is_fraud set
 
@@ -754,7 +755,7 @@ xgb_res %>% collect_metrics(summarize = TRUE)
 ## Get variable importance using `vip` package
 
 
-```{r}
+```{r,error=TRUE}
 
 library(vip)
 
@@ -770,7 +771,7 @@ last_fit_xgb %>%
 ## Plot Final Confusion matrix and ROC curve
 
 
-```{r}
+```{r,error=TRUE}
 ## Final Confusion Matrix
 
 last_fit_xgb %>%
@@ -792,7 +793,7 @@ last_fit_xgb %>%
 
 - How much money (in US\$ terms) are fraudulent transactions costing the company? Generate a table that summarizes the total amount of legitimate and fraudulent transactions per year and calculate the % of fraudulent transactions, in US\$ terms. Compare your model vs the naive classification that we do not have any fraudulent transactions. 
 
-```{r}
+```{r,error=TRUE}
 #| label: savings-for-cc-company
 
 # Boosted has highest mean ROC and quickest processing time
@@ -851,3 +852,8 @@ cost_summary
 - Our classifier also has some false positives, `r scales::dollar(cost_summary$false_positives)`, namely flagging transactions as fraudulent, but which were legitimate. Assuming the card company makes around 2% for each transaction (source: https://startups.co.uk/payment-processing/credit-card-processing-fees/), the amount of money lost due to these false positives is `r scales::dollar(cost_summary$false_positives * 0.02)`
 
 - The \$ improvement over the naive policy is `r scales::dollar(cost_summary$false_naives - cost_summary$false_negatives - cost_summary$false_positives * 0.02)`.
+
+```{r,error=TRUE}
+
+```
+
