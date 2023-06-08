@@ -1,6 +1,6 @@
 ---
 title: "Final Group project"
-author: "Jenna Thomas (Group 12)"
+author: "Jenna Thomas, Colby Richardson (Group 12)"
 date: "`r Sys.Date()`"
 output:
   html_document:
