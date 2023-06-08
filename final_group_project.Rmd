@@ -31,6 +31,9 @@ library(vip)
 library(ranger)
 library(sf)
 library(tidygeocoder)
+library(GGally)
+
+options(scipen = 999)
 
 ```
 
@@ -69,6 +72,7 @@ card_fraud <- read_csv("card_fraud.csv") %>%
          )
 
 glimpse(card_fraud)
+
 ```
 
 The data dictionary is as follows
@@ -133,8 +137,41 @@ Group all variables by type and examine each variable class by class. The datase
 5.  Numerical
 
 ```{r}
-
+# check class for each variable
 sapply(card_fraud, class)
+
+# select a smaller subset
+my_card_is_fraud <- card_fraud %>% 
+  # select a smaller subset, 20% of the entire dataframe 
+  slice_sample(prop = 0.2) 
+
+#observations: 
+#1) low correlation between variables suggests these are quite independent variables 
+#2) distributions: amt is skewed left (more large transactions), hour disproportionately in the middle of the night, slightly less fraud in the middle of the week
+#3) other: amt clusters below around 300 and just below 1000 
+my_card_is_fraud %>% 
+  filter(is_fraud == 1) %>% 
+  select(amt,hour,wday,age,distance_km)%>% 
+  ggpairs(alpha=0.5)+
+  theme_bw() +
+  theme(axis.text = element_text(size = 5))
+
+
+my_card_no_fraud <- card_fraud %>% 
+  # select a smaller subset, 1% of the entire dataframe 
+  slice_sample(prop = 0.001) 
+
+##observations: 
+#1) low correlation between variables suggests these are quite independent variables
+#2) distributions: AMT is skewed right (more small transactions), HOUR: more evenly spread from afternoon to night, WDAY: more drastic concentration of transactions towards beginning of the week, AGE: more right skewed than fraud data (i.e. older people more vulnerable to fraud)
+#3) other: amounts > 250 very uncommon
+my_card_no_fraud %>% 
+  filter(is_fraud == 0) %>% 
+  select(amt,hour,wday,age,distance_km)%>% 
+  ggpairs()+
+  theme_bw() +
+  theme(axis.text = element_text(size = 5))
+
 
 # assess whether there's significant difference between amount of fraud in 2019 vs. 2020
 card_fraud %>%
@@ -765,7 +802,7 @@ last_fit_xgb %>%
 ```{r}
 #| label: savings-for-cc-company
 
-# Boosted has highest mean ROC
+# Boosted has highest mean ROC and quickest processing time
 
 best_model_wflow <- xgb_wflow
 
