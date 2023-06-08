@@ -185,15 +185,12 @@ card_fraud %>%
 
 # assess fraud by state  
 
-card_fraud_by_state <- card_fraud %>%
+card_fraud %>%
   group_by(is_fraud,state) %>%
-  summarise(total=n()) %>% 
+  summarise(total=n()) %>%
   filter(is_fraud == 1) %>% 
-  arrange(desc(total)) %>% 
-  slice(1:10)
-  
-print(card_fraud_by_state)
-ggplot(card_fraud_by_state, aes(x = reorder(state, -total), y = total)) +
+  arrange(desc(total)) %>%
+  ggplot(aes(x = reorder(state, -total), y = total)) +
   geom_bar(stat = "identity", fill="blue") +
   geom_text(aes(label=total),position=position_stack(vjust=0.5)) +
   xlab("State") +
@@ -202,16 +199,12 @@ ggplot(card_fraud_by_state, aes(x = reorder(state, -total), y = total)) +
   theme_minimal()
 
 # assess fraud by category
-card_fraud_by_category <- card_fraud %>%
+card_fraud %>%
   group_by(is_fraud,category) %>%
   summarise(total=n()) %>% 
   filter(is_fraud == 1) %>% 
-  arrange(desc(total)) %>% 
-  slice(1:5)
-  
-print(card_fraud_by_category)
-
-ggplot(card_fraud_by_category, aes(x = reorder(category, -total), y = total)) +
+  arrange(desc(total)) %>%
+  ggplot(aes(x = reorder(category, -total), y = total)) +
   geom_bar(stat = "identity", fill="blue") +
   geom_text(aes(label=total),position=position_stack(vjust=0.5)) +
   xlab("State") +
